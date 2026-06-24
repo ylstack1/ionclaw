@@ -20,6 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "zulu"
+          java-version: "17"
+
       - name: Setup Android NDK
         run: |
           NDK_VERSION=$(ls -1 $ANDROID_HOME/ndk/ | sort -V | tail -1)
@@ -56,11 +62,14 @@ jobs:
             -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static
           cmake --build build/android-arm64-v8a --config ${{ env.BUILD_TYPE }} -j$(nproc)
 
-      - name: Verify library
-        if: ${{ !inputs.release }}
-        run: file build/android-arm64-v8a/lib/libionclaw.so
+      - name: Build x86_64
+        run: |
+          cmake -B build/android-x86_64 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DIONCLAW_BUILD_SHARED=ON \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static
+          cmake --build build/android-x86_64 --config ${{ env.BUILD_TYPE }} -j$(nproc)
 
-      - name: Build armeabi-v7a
+      - name: Build armeabi-v7a (Release only)
         if: ${{ inputs.release }}
         run: |
           cmake -B build/android-armeabi-v7a -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DIONCLAW_BUILD_SHARED=ON \
@@ -68,15 +77,7 @@ jobs:
             -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static
           cmake --build build/android-armeabi-v7a --config ${{ env.BUILD_TYPE }} -j$(nproc)
 
-      - name: Build x86_64
-        if: ${{ inputs.release }}
-        run: |
-          cmake -B build/android-x86_64 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DIONCLAW_BUILD_SHARED=ON \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
-            -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static
-          cmake --build build/android-x86_64 --config ${{ env.BUILD_TYPE }} -j$(nproc)
-
-      - name: Build x86
+      - name: Build x86 (Release only)
         if: ${{ inputs.release }}
         run: |
           cmake -B build/android-x86 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DIONCLAW_BUILD_SHARED=ON \
@@ -84,7 +85,39 @@ jobs:
             -DANDROID_ABI=x86 -DANDROID_PLATFORM=android-24 -DANDROID_STL=c++_static
           cmake --build build/android-x86 --config ${{ env.BUILD_TYPE }} -j$(nproc)
 
-      - name: Package libraries
+      - name: Link libraries to Android project
+        run: |
+          # common architectures
+          for abi in arm64-v8a x86_64; do
+            mkdir -p apps/android/library/src/main/jniLibs/$abi
+            cp build/android-$abi/lib/libionclaw.so apps/android/library/src/main/jniLibs/$abi/
+            cp $(find $ANDROID_NDK/toolchains/llvm/prebuilt -path "*/lib/linux/$(if [ $abi == "arm64-v8a" ]; then echo "aarch64"; else echo "x86_64"; fi)/libomp.so" | head -1) apps/android/library/src/main/jniLibs/$abi/libomp.so
+          done
+
+          # release-only architectures
+          if [ "${{ inputs.release }}" == "true" ]; then
+            for abi in armeabi-v7a x86; do
+              mkdir -p apps/android/library/src/main/jniLibs/$abi
+              cp build/android-$abi/lib/libionclaw.so apps/android/library/src/main/jniLibs/$abi/
+              cp $(find $ANDROID_NDK/toolchains/llvm/prebuilt -path "*/lib/linux/$(if [ $abi == "armeabi-v7a" ]; then echo "arm"; else echo "i386"; fi)/libomp.so" | head -1) apps/android/library/src/main/jniLibs/$abi/libomp.so
+            done
+          fi
+
+      - name: Build Android Library (AAR)
+        run: |
+          cd apps/android/library
+          chmod +x gradlew
+          ./gradlew assembleRelease
+          mkdir -p ../../../build/android-aar
+          cp build/outputs/aar/ionclaw-release.aar ../../../build/android-aar/ionclaw.aar
+
+      - name: Build Android App (APK & AAB)
+        run: |
+          cd apps/android/app
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease
+
+      - name: Package libraries (.tar.gz)
         if: ${{ inputs.release }}
         run: |
           for abi in arm64-v8a armeabi-v7a x86_64 x86; do
@@ -95,9 +128,12 @@ jobs:
           cp LICENSE.md dist/
           tar -czf ionclaw-android.tar.gz -C dist .
 
-      - name: Upload artifact
-        if: ${{ inputs.release }}
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ionclaw-android
-          path: ionclaw-android.tar.gz
+          path: |
+            ionclaw-android.tar.gz
+            apps/android/app/build/outputs/apk/release/*.apk
+            apps/android/app/build/outputs/bundle/release/*.aab
+            build/android-aar/ionclaw.aar
