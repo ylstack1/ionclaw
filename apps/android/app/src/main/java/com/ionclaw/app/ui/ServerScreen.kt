@@ -67,6 +67,7 @@ import com.ionclaw.app.server.ServerViewModel
 import com.ionclaw.app.ui.theme.BrandPrimary
 import com.ionclaw.app.ui.theme.BrandSuccess
 import com.ionclaw.app.ui.theme.BrandDanger
+import com.ionclaw.app.ui.theme.MutedText
 import com.ionclaw.app.ui.theme.CardBorder
 import com.ionclaw.app.ui.theme.CardSurface
 import com.ionclaw.app.ui.theme.HeaderBackground
