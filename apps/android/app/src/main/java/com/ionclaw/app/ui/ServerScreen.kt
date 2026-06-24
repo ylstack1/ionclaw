@@ -42,7 +42,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -69,8 +71,12 @@ import com.ionclaw.app.ui.theme.CardBorder
 import com.ionclaw.app.ui.theme.CardSurface
 import com.ionclaw.app.ui.theme.HeaderBackground
 import com.ionclaw.app.ui.theme.ScreenBackground
+import com.ionclaw.app.ui.theme.TextOnHeader
+import com.ionclaw.app.ui.theme.TextPrimary
+import com.ionclaw.app.ui.theme.TextSecondary
 
 private val ButtonShape = RoundedCornerShape(12.dp)
+private val CardShape = RoundedCornerShape(20.dp)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,16 +85,21 @@ fun ServerScreen(viewModel: ServerViewModel, onOpenPanel: () -> Unit, modifier: 
         modifier = modifier,
         containerColor = ScreenBackground,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Image(
-                        painter = painterResource(R.drawable.logo_dark),
-                        contentDescription = "IonClaw",
-                        modifier = Modifier.height(36.dp)
+            Surface(shadowElevation = 4.dp) {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Image(
+                            painter = painterResource(R.drawable.logo_dark),
+                            contentDescription = "IonClaw",
+                            modifier = Modifier.height(32.dp)
+                        )
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = HeaderBackground,
+                        titleContentColor = TextOnHeader
                     )
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = HeaderBackground)
-            )
+                )
+            }
         }
     ) { padding ->
         Column(
@@ -96,9 +107,9 @@ fun ServerScreen(viewModel: ServerViewModel, onOpenPanel: () -> Unit, modifier: 
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 40.dp),
+                .padding(horizontal = 20.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             ServerStatusView(isRunning = viewModel.isRunning)
 
@@ -111,12 +122,21 @@ fun ServerScreen(viewModel: ServerViewModel, onOpenPanel: () -> Unit, modifier: 
             }
 
             viewModel.lastError?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BrandDanger
-                )
+                Surface(
+                    color = BrandDanger.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BrandDanger,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -126,29 +146,43 @@ private fun ServerCard(viewModel: ServerViewModel) {
     val config = viewModel.config
     val fieldsEnabled = !viewModel.isRunning && !viewModel.isBusy
 
-    SectionCard(title = "Server", icon = { Icon(Icons.Outlined.Dns, null, tint = BrandPrimary, modifier = Modifier.size(18.dp)) }, iconTint = BrandPrimary) {
-        Row {
+    SectionCard(
+        title = "Connection Settings",
+        icon = { Icon(Icons.Outlined.Dns, null, tint = BrandPrimary, modifier = Modifier.size(20.dp)) },
+        iconTint = BrandPrimary
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             OutlinedTextField(
                 value = config.host,
                 onValueChange = { viewModel.updateConfig(it, config.port) },
-                label = { Text("Host") },
+                label = { Text("Server Host") },
+                placeholder = { Text("0.0.0.0") },
                 singleLine = true,
                 enabled = fieldsEnabled,
-                modifier = Modifier.weight(2f)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BrandPrimary,
+                    unfocusedBorderColor = CardBorder
+                )
             )
-
-            Spacer(Modifier.width(12.dp))
 
             OutlinedTextField(
                 value = config.port.toString(),
                 onValueChange = { input ->
                     viewModel.updateConfig(config.host, input.filter(Char::isDigit).take(5).toIntOrNull() ?: 0)
                 },
-                label = { Text("Port") },
+                label = { Text("Server Port") },
+                placeholder = { Text("8080") },
                 singleLine = true,
                 enabled = fieldsEnabled,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BrandPrimary,
+                    unfocusedBorderColor = CardBorder
+                )
             )
         }
     }
@@ -157,48 +191,58 @@ private fun ServerCard(viewModel: ServerViewModel) {
 @Composable
 private fun ActionButtons(viewModel: ServerViewModel, onOpenPanel: () -> Unit) {
     if (viewModel.isBusy) {
-        CircularProgressIndicator(
-            color = BrandPrimary,
-            strokeWidth = 2.5.dp,
-            modifier = Modifier.size(32.dp)
-        )
+        Box(modifier = Modifier.height(120.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                color = BrandPrimary,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(40.dp)
+            )
+        }
         return
     }
 
     Column(
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (viewModel.isRunning) {
-            OutlinedAction("Stop Server", Icons.Filled.Stop, BrandDanger, viewModel::stop)
-            OutlinedAction("Open Panel", Icons.Outlined.Language, BrandPrimary, onOpenPanel)
+            PrimaryAction("Open Control Panel", Icons.Outlined.Language, BrandPrimary, onOpenPanel)
+            SecondaryAction("Stop Server", Icons.Filled.Stop, BrandDanger, viewModel::stop)
         } else {
-            Button(
-                onClick = viewModel::start,
-                shape = ButtonShape,
-                colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary),
-                modifier = Modifier.width(240.dp).height(52.dp)
-            ) {
-                Icon(Icons.Filled.PlayArrow, null)
-                Text("Start Server", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
-            }
-
-            OutlinedAction("Initialize Project", Icons.Outlined.FolderOpen, BrandPrimary, viewModel::initializeProject)
+            PrimaryAction("Start Server", Icons.Filled.PlayArrow, BrandPrimary, viewModel::start)
+            SecondaryAction("Initialize Project", Icons.Outlined.FolderOpen, TextSecondary, viewModel::initializeProject)
         }
     }
 }
 
 @Composable
-private fun OutlinedAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, onClick: () -> Unit) {
+private fun PrimaryAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shape = ButtonShape,
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth().height(56.dp)
+    ) {
+        Icon(icon, null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun SecondaryAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color, onClick: () -> Unit) {
     OutlinedButton(
         onClick = onClick,
         shape = ButtonShape,
-        border = BorderStroke(1.5.dp, color),
+        border = BorderStroke(1.5.dp, color.copy(alpha = 0.5f)),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = color),
-        modifier = Modifier.width(240.dp).height(52.dp)
+        modifier = Modifier.fillMaxWidth().height(56.dp)
     ) {
-        Icon(icon, null)
-        Text(label, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+        Icon(icon, null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -207,37 +251,61 @@ private fun NetworkCard(addresses: List<String>, port: Int) {
     val context = LocalContext.current
     var copiedAddress by remember { mutableStateOf<String?>(null) }
 
-    SectionCard(title = "Network", icon = { Icon(Icons.Outlined.Wifi, null, tint = BrandSuccess, modifier = Modifier.size(18.dp)) }, iconTint = BrandSuccess) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    SectionCard(
+        title = "Access URLs",
+        icon = { Icon(Icons.Outlined.Wifi, null, tint = BrandSuccess, modifier = Modifier.size(20.dp)) },
+        iconTint = BrandSuccess
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             addresses.forEach { address ->
                 val url = "http://$address:$port"
                 val copied = copiedAddress == address
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            copyToClipboard(context, url)
-                            copiedAddress = address
-                        }
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Surface(
+                    onClick = {
+                        copyToClipboard(context, url)
+                        copiedAddress = address
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = ScreenBackground.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, if (copied) BrandSuccess.copy(alpha = 0.5f) else Color.Transparent)
                 ) {
-                    Text(
-                        text = url,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF616161),
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (address == "127.0.0.1" || address == "localhost") "Local Access" else "Network Access",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MutedText
+                            )
+                            Text(
+                                text = url,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = TextPrimary
+                            )
+                        }
 
-                    Icon(
-                        imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
-                        contentDescription = "Copy",
-                        tint = if (copied) BrandSuccess else BrandPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                        Icon(
+                            imageVector = if (copied) Icons.Filled.Check else Icons.Filled.ContentCopy,
+                            contentDescription = "Copy",
+                            tint = if (copied) BrandSuccess else BrandPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
+
+            Text(
+                text = "Tap an address to copy it to clipboard.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedText,
+                modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+            )
         }
     }
 }
@@ -246,16 +314,17 @@ private fun NetworkCard(addresses: List<String>, port: Int) {
 private fun SectionCard(title: String, icon: @Composable () -> Unit, iconTint: Color, content: @Composable () -> Unit) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = CardShape,
         colors = CardDefaults.outlinedCardColors(containerColor = CardSurface),
-        border = BorderStroke(1.dp, CardBorder)
+        border = BorderStroke(1.dp, CardBorder),
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(iconTint.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -264,14 +333,14 @@ private fun SectionCard(title: String, icon: @Composable () -> Unit, iconTint: C
 
                 Text(
                     text = title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 12.dp)
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    modifier = Modifier.padding(start = 16.dp)
                 )
             }
 
-            Box(modifier = Modifier.padding(top = 20.dp)) {
+            Box(modifier = Modifier.padding(top = 24.dp)) {
                 content()
             }
         }
